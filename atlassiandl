@@ -1,0 +1,99 @@
+#!/bin/sh
+
+softwareName=$1
+
+baseurl="http://downloads.atlassian.com/software/$softwareName/downloads/atlassian-$softwareName"
+
+usage () {
+	echo "Usage: $0 product" >&2
+	exit 1
+}
+
+debug () {
+	#echo $@ >&2
+	echo > /dev/null
+}
+
+if [ $# -ne 1 ]
+then
+	usage
+fi
+
+firstMajor=0
+lastMajor=$firstMajor
+firstSubMajor=0
+lastSubMajor=$firstSubMajor
+firstMinor=0
+lastMinor=$firstMinor
+
+# Determine valid major version - lower limit
+while [ $(wget -nv --spider ${baseurl}-$firstMajor.$firstSubMajor.tar.gz 2>&1 | grep "200 OK" | wc -l) -eq 0 -a $(wget -nv --spider ${baseurl}-$firstMajor.$firstSubMajor.$firstMinor.tar.gz 2>&1 | grep "200 OK" | wc -l) -eq 0 ]
+do
+	firstMajor=$(echo $firstMajor+1 | bc)
+	debug $firstMajor
+done
+lastMajor=$firstMajor
+debug First Major Version: $firstMajor
+
+# Determine valid major version - upper limit
+while [ $(wget -nv --spider ${baseurl}-$lastMajor.$lastSubMajor.tar.gz 2>&1 | grep "200 OK" | wc -l) -eq 1 -o $(wget -nv --spider ${baseurl}-$lastMajor.$lastSubMajor.$lastMinor.tar.gz 2>&1 | grep "200 OK" | wc -l) -eq 1 ]
+do
+	lastMajor=$(echo $lastMajor+1 | bc)
+	debug $lastMajor
+done
+lastMajor=$(echo $lastMajor-1 | bc)
+debug Last Major Version: $lastMajor
+
+# Determine valid submajor version - lower limit
+while [ $(wget -nv --spider ${baseurl}-$firstMajor.$firstSubMajor.tar.gz 2>&1 | grep "200 OK" | wc -l) -eq 0 -a $(wget -nv --spider ${baseurl}-$firstMajor.$firstSubMajor.$firstMinor.tar.gz 2>&1 | grep "200 OK" | wc -l) -eq 0 ]
+do
+	firstSubMajor=$(echo $firstSubMajor+1 | bc)
+	debug $firstSubMajor
+done
+lastSubMajor=$firstSubMajor
+debug First SubMajor found for that major version: $firstSubMajor
+
+# Determine valid submajor version - upper limit
+while [ $(wget -nv --spider ${baseurl}-$lastMajor.$lastSubMajor.tar.gz 2>&1 | grep "200 OK" | wc -l) -eq 1 -o $(wget -nv --spider ${baseurl}-$lastMajor.$lastSubMajor.$lastMinor.tar.gz 2>&1 | grep "200 OK" | wc -l) -eq 1 ]
+do
+	lastSubMajor=$(echo $lastSubMajor+1 | bc)
+	debug $lastSubMajor
+done
+lastSubMajor=$(echo $lastSubMajor-1 | bc)
+debug Last SubMajor found for that major version: $lastSubMajor
+
+# Determine valid minor version - lower limit
+while [ $(wget -nv --spider ${baseurl}-$lastMajor.$lastSubMajor.$firstMinor.tar.gz 2>&1 | grep "200 OK" | wc -l) -eq 0 ]
+do
+	firstMinor=$(echo $firstMinor+1 | bc)
+	debug $firstMinor
+done
+lastMinor=$firstMinor
+
+# Determine valid minor version - upper limit
+while [ $(wget -nv --spider ${baseurl}-$lastMajor.$lastSubMajor.$lastMinor.tar.gz 2>&1 | grep "200 OK" | wc -l) -eq 1 ]
+do
+	lastMinor=$(echo $lastMinor+1 | bc)
+	debug $lastMinor
+done
+lastMinor=$(echo $lastMinor-1 | bc)
+
+# Display results.
+debug First Major Version: $firstMajor
+debug Last Major Version: $lastMajor
+debug First SubMajor found for that major version: $firstSubMajor
+debug Last SubMajor found for that major version: $lastSubMajor
+debug First Minor found for that Submajor version: $firstMinor
+debug Last Minor found for that Submajor version: $lastMinor
+debug Last Version: $lastMajor.$lastSubMajor.$lastMinor
+
+echo "Will download $softwareName version $lastMajor.$lastSubMajor.$lastMinor. Do you want to continue? [Y/n]"
+read confirm
+
+if [ "$confirm" != "Y" -a "$confirm" != "y" -a "$confirm" != "" ]
+then
+	echo Aborting...
+	exit
+fi
+
+wget ${baseurl}-$lastMajor.$lastSubMajor.$lastMinor.tar.gz
